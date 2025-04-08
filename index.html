@@ -1,0 +1,91 @@
+ -*- coding: utf-8 -*-
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>學號查詢 Firestore</title>
+</head>
+<body>
+  <h2>📚 學生資料查詢系統</h2>
+
+  <label for="studentId">請選擇或輸入學號：</label><br>
+  <select id="studentSelect" onchange="fetchStudent()">
+    <option value="">--請選擇--</option>
+  </select>
+  <br><br>
+  <input type="text" id="studentId" placeholder="或輸入學號查詢">
+  <button onclick="fetchStudent(true)">查詢</button>
+
+  <hr>
+  <div id="result"></div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // ✅ 替換為你的 Firebase 設定
+    const firebaseConfig = {
+      apiKey: "AIzaSyBGzXkRyQqKD7aASq3CwpGGgk2o54A6-m4",
+      authDomain: "mptop5243-e77e4.firebaseapp.com",
+      databaseURL: "https://mptop5243-e77e4-default-rtdb.firebaseio.com",
+      projectId: "mptop5243-e77e4",
+      storageBucket: "mptop5243-e77e4.firebasestorage.app",
+      messagingSenderId: "616201181490",
+      appId: "1:616201181490:web:73f8cc1d0e98d3e182df2b"
+    };
+
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 🔽 取得所有學號並放進下拉選單
+    async function loadStudentList() {
+      const select = document.getElementById("studentSelect");
+      const querySnapshot = await getDocs(collection(db, "南山學生資料"));
+
+      querySnapshot.forEach((docSnap) => {
+        const option = document.createElement("option");
+        option.value = docSnap.id;
+        option.text = `${docSnap.id} - ${docSnap.data().姓名}`;
+        select.appendChild(option);
+      });
+    }
+
+    // 🔍 查詢學生資料（使用學號）
+    async function fetchStudent(fromInput = false) {
+      const id = fromInput
+        ? document.getElementById("studentId").value.trim()
+        : document.getElementById("studentSelect").value;
+
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerHTML = "🔄 查詢中...";
+
+      if (!id) {
+        resultDiv.innerHTML = "⚠️ 請選擇或輸入學號";
+        return;
+      }
+
+      const docRef = doc(db, "南山學生資料", id);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        resultDiv.innerHTML = `
+          <h3>🎓 查詢結果</h3>
+          <p><strong>學號：</strong> ${id}</p>
+          <p><strong>姓名：</strong> ${data.姓名}</p>
+          <p><strong>學號：</strong> ${data.學號}</p>
+          <p><strong>班級：</strong> ${data.班級}</p>
+        `;
+      } else {
+        resultDiv.innerHTML = `❌ 找不到學號 <strong>${id}</strong> 的資料`;
+      }
+    }
+
+    // 頁面載入後載入學號清單
+    window.onload = loadStudentList;
+    window.fetchStudent = fetchStudent; // 讓 button 可呼叫
+  </script>
+</body>
+</html>
