@@ -1,90 +1,153 @@
-by tiean an ping
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>學號查詢 Firestore</title>
+  <title>多層下拉查詢學生</title>
 </head>
 <body>
-  <h2>📚 南山中學學生資料查詢系統</h2>
+  <h2>📚 學生資料查詢系統</h2>
 
-  <label for="studentId">請選擇或輸入學號：</label><br>
-  <select id="studentSelect" onchange="fetchStudent()">
-    <option value="">--請選擇--</option>
+  <label>學制：</label>
+  <select id="typeSelect" onchange="filterGrade()">
+    <option value="">--請選擇學制--</option>
+    <option value="國中">國中</option>
+    <option value="高中">高中</option>
   </select>
   <br><br>
-  <input type="text" id="studentId" placeholder="或輸入學號查詢">
-  <button onclick="fetchStudent(true)">查詢</button>
+
+  <label>年級：</label>
+  <select id="gradeSelect" onchange="filterClass()">
+    <option value="">--請選擇年級--</option>
+  </select>
+  <br><br>
+
+  <label>班級：</label>
+  <select id="classSelect" onchange="filterNames()">
+    <option value="">--請選擇班級--</option>
+  </select>
+  <br><br>
+
+  <label>學生：</label>
+  <select id="nameSelect" onchange="showStudent()">
+    <option value="">--請選擇學生--</option>
+  </select>
 
   <hr>
   <div id="result"></div>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // ✅ 替換為你的 Firebase 設定
     const firebaseConfig = {
-      apiKey: "AIzaSyBGzXkRyQqKD7aASq3CwpGGgk2o54A6-m4",
-      authDomain: "mptop5243-e77e4.firebaseapp.com",
-      databaseURL: "https://mptop5243-e77e4-default-rtdb.firebaseio.com",
-      projectId: "mptop5243-e77e4",
-      storageBucket: "mptop5243-e77e4.firebasestorage.app",
-      messagingSenderId: "616201181490",
-      appId: "1:616201181490:web:73f8cc1d0e98d3e182df2b"
+      apiKey: "AIzaSyAMlgRs8aO-eZSamx1-EF3y2obIAOLvaZI",
+      authDomain: "nanshan-student.firebaseapp.com",
+      projectId: "nanshan-student",
+      storageBucket: "nanshan-student.firebasestorage.app",
+      messagingSenderId: "879754099667",
+      appId: "1:879754099667:web:0c0805c2d918b8b41e4d26",
+      measurementId: "G-KTX7TH9ETW"
     };
 
-    // 初始化 Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // 🔽 取得所有學號並放進下拉選單
-    async function loadStudentList() {
-      const select = document.getElementById("studentSelect");
-      const querySnapshot = await getDocs(collection(db, "南山學生資料"));
+    let students = [];
 
-      querySnapshot.forEach((docSnap) => {
-        const option = document.createElement("option");
-        option.value = docSnap.id;
-        option.text = `${docSnap.id} - ${docSnap.data().姓名}`;
-        select.appendChild(option);
+    async function loadData() {
+      const snapshot = await getDocs(collection(db, "南山學生資料"));
+      students = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        data.id = doc.id;
+        students.push(data);
+      });
+      console.log("已載入學生資料：", students.length);
+    }
+
+    function filterGrade() {
+      const type = document.getElementById("typeSelect").value;
+      const gradeSelect = document.getElementById("gradeSelect");
+      gradeSelect.innerHTML = '<option value="">--請選擇年級--</option>';
+
+      const grades = new Set(
+        students.filter(s => s.學制 === type).map(s => s.年級)
+      );
+
+      [...grades].sort().forEach(g => {
+        const opt = document.createElement("option");
+        opt.value = g;
+        opt.textContent = g;
+        gradeSelect.appendChild(opt);
+      });
+
+      // 重設下層
+      document.getElementById("classSelect").innerHTML = '<option value="">--請選擇班級--</option>';
+      document.getElementById("nameSelect").innerHTML = '<option value="">--請選擇學生--</option>';
+    }
+
+    function filterClass() {
+      const type = document.getElementById("typeSelect").value;
+      const grade = document.getElementById("gradeSelect").value;
+      const classSelect = document.getElementById("classSelect");
+      classSelect.innerHTML = '<option value="">--請選擇班級--</option>';
+
+      const classes = new Set(
+        students.filter(s => s.學制 === type && s.年級 === grade).map(s => s.班級)
+      );
+
+      [...classes].sort().forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        classSelect.appendChild(opt);
+      });
+
+      document.getElementById("nameSelect").innerHTML = '<option value="">--請選擇學生--</option>';
+    }
+
+    function filterNames() {
+      const type = document.getElementById("typeSelect").value;
+      const grade = document.getElementById("gradeSelect").value;
+      const cls = document.getElementById("classSelect").value;
+      const nameSelect = document.getElementById("nameSelect");
+      nameSelect.innerHTML = '<option value="">--請選擇學生--</option>';
+
+      const names = students.filter(s =>
+        s.學制 === type && s.年級 === grade && s.班級 === cls
+      );
+
+      names.sort((a, b) => a.姓名.localeCompare(b.姓名)).forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.姓名;
+        nameSelect.appendChild(opt);
       });
     }
+    window.filterNames = filterNames;
 
-    // 🔍 查詢學生資料（使用學號）
-    async function fetchStudent(fromInput = false) {
-      const id = fromInput
-        ? document.getElementById("studentId").value.trim()
-        : document.getElementById("studentSelect").value;
+    function showStudent() {
+      const id = document.getElementById("nameSelect").value;
+      const s = students.find(s => s.id === id);
+      if (!s) return;
 
-      const resultDiv = document.getElementById("result");
-      resultDiv.innerHTML = "🔄 查詢中...";
-
-      if (!id) {
-        resultDiv.innerHTML = "⚠️ 請選擇或輸入學號";
-        return;
-      }
-
-      const docRef = doc(db, "南山學生資料", id);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        resultDiv.innerHTML = `
-          <h3>🎓 查詢結果</h3>
-          <p><strong>學號：</strong> ${id}</p>
-          <p><strong>姓名：</strong> ${data.姓名}</p>
-          <p><strong>班級：</strong> ${data.班級}</p>
-        `;
-      } else {
-        resultDiv.innerHTML = `❌ 找不到學號 <strong>${id}</strong> 的資料`;
-      }
+      document.getElementById("result").innerHTML = `
+        <h3>🎓 查詢結果</h3>
+        <p><strong>學號：</strong> ${s.學號 || s.id}</p>
+        <p><strong>姓名：</strong> ${s.姓名}</p>
+        <p><strong>學制：</strong> ${s.學制}</p>
+        <p><strong>年級：</strong> ${s.年級}</p>
+        <p><strong>班級：</strong> ${s.班級}</p>
+      `;
     }
 
-    // 頁面載入後載入學號清單
-    window.onload = loadStudentList;
-    window.fetchStudent = fetchStudent; // 讓 button 可呼叫
+    // ⬇ 掛給 HTML 用
+    window.filterGrade = filterGrade;
+    window.filterClass = filterClass;
+    window.filterNames = filterNames;
+    window.showStudent = showStudent;
+
+    window.onload = loadData;
   </script>
 </body>
 </html>
