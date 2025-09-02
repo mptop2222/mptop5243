@@ -1,340 +1,457 @@
- <!DOCTYPE html>
-<html lang="zh-Hant">
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>多層下拉查詢學生</title>
+  <title>RFID 刷卡上傳與查詢</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 30px;
-      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-      min-height: 100vh;
-      background-attachment: fixed;
-      color: #333;
-    }
-    
-    h2 {
-      color: #2c3e50;
       text-align: center;
-      margin-bottom: 30px;
-      font-size: 2.2em;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    }
-    
-    h3 {
-      color: #3498db;
-      border-bottom: 2px solid #3498db;
-      padding-bottom: 8px;
-      margin-top: 0;
-    }
-    
-    .container {
-      background-color: white;
-      border-radius: 15px;
+      font-family: Arial, sans-serif;
       padding: 30px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    input, button {
+      font-size: 20px;
+      margin: 10px;
+      padding: 10px;
+    }
+
+    #rfidInput, #studentIdInput {
+      font-size: 40px;
+      width: 60%;
+    }
+
+    #status {
+      font-size: 80px;
+      font-weight: bold;
+      margin-top: 40px;
+    }
+
+    .found { color: blue; }
+    .not-found { color: red; }
+    .error { color: orange; }
+
+    #recordsTable {
+      margin-top: 40px;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 20px;
+    }
+
+    #recordsTable th, #recordsTable td {
+      border: 1px solid #999;
+      padding: 10px;
+    }
+
+    #recordsTable th {
+      background-color: #eee;
+    }
+
+    .input-section {
+      margin-bottom: 20px;
     }
     
-    select, input {
-      padding: 10px 15px;
-      width: 250px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      font-size: 16px;
-      transition: all 0.3s;
+    .latest-record {
+      background-color: #ffffcc;
     }
-    
-    select:focus, input:focus {
-      outline: none;
-      border-color: #3498db;
-      box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+
+    #wordContainer {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      max-width: 100%;
+      overflow: auto;
+      text-align: left;
     }
-    
-    .search-container {
-      margin-bottom: 30px;
+
+    #wordViewer {
+      width: 100%;
+      min-height: 500px;
       padding: 20px;
-      background-color: #f8f9fa;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    }
-    
-    #result {
-      margin-top: 30px;
-      padding: 25px;
-      border: 1px solid #e0e0e0;
-      border-radius: 10px;
       background-color: white;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
     }
-    
-    .student-info {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
+
+    .highlight-name {
+      background-color: yellow;
+      border: 2px solid red;
+      border-radius: 3px;
+      padding: 0 2px;
     }
-    
-    .student-info p {
-      margin: 8px 0;
-      font-size: 16px;
+
+    .word-controls {
+      margin: 15px 0;
     }
-    
-    .student-info strong {
-      color: #2c3e50;
+
+    /* 保留Word原始樣式 */
+    .word-content {
+      font-family: inherit;
+      white-space: normal;
     }
-    
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
-      transition: all 0.3s;
-      margin-left: 10px;
+    .word-content p {
+      margin: 0;
+      padding: 0;
     }
-    
-    button:hover {
-      background-color: #2980b9;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    .word-content table {
+      border-collapse: collapse;
+      width: 100%;
     }
-    
-    hr {
-      border: 0;
-      height: 1px;
-      background: linear-gradient(to right, transparent, #3498db, transparent);
-      margin: 30px 0;
-    }
-    
-    label {
-      display: inline-block;
-      width: 80px;
-      font-weight: 500;
-      margin-right: 10px;
-    }
-    
-    @media (max-width: 768px) {
-      body {
-        padding: 15px;
-      }
-      
-      .container {
-        padding: 15px;
-      }
-      
-      select, input {
-        width: 100%;
-        margin-bottom: 10px;
-      }
-      
-      button {
-        width: 100%;
-        margin-left: 0;
-        margin-top: 10px;
-      }
-      
-      .student-info {
-        grid-template-columns: 1fr;
-      }
+    .word-content table, .word-content th, .word-content td {
+      border: 1px solid black;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>📚 學生資料查詢系統</h2>
+  <h1>南山中學刷卡系統</h1>
+  
+  <div class="input-section">
+    <h2>🔖 RFID刷卡</h2>
+    <input type="text" id="rfidInput" autofocus placeholder="請刷卡" />
+  </div>
+  
+  <div class="input-section">
+    <h2>🆔 學號輸入</h2>
+    <input type="text" id="studentIdInput" placeholder="請輸入學號" />
+    <button onclick="submitStudentId()">提交</button>
+  </div>
+  
+  <p id="status"></p>
 
-    <div class="search-container">
-      <h3>🔍 多層下拉查詢</h3>
-      <label>學制：</label>
-      <select id="typeSelect" onchange="filterGrade()">
-        <option value="">--請選擇學制--</option>
-        <option value="國中">國中</option>
-        <option value="高中">高中</option>
-      </select>
-      <br><br>
+  <audio id="successSound" src="success.mp3" preload="auto"></audio>
+  <audio id="errorSound" src="error.mp3" preload="auto"></audio>
 
-      <label>年級：</label>
-      <select id="gradeSelect" onchange="filterClass()">
-        <option value="">--請選擇年級--</option>
-      </select>
-      <br><br>
-
-      <label>班級：</label>
-      <select id="classSelect" onchange="filterNames()">
-        <option value="">--請選擇班級--</option>
-      </select>
-      <br><br>
-
-      <label>學生：</label>
-      <select id="nameSelect" onchange="showStudent()">
-        <option value="">--請選擇學生--</option>
-      </select>
+  <hr />
+  <h2>📄 上傳名冊Word檔</h2>
+  <input type="file" id="wordUpload" accept=".docx,.doc" />
+  <button onclick="loadWord()">載入Word檔</button>
+  
+  <div id="wordContainer" style="display: none;">
+    <div class="word-controls">
+      <button onclick="downloadMarkedRoster()">下載已標記名冊</button>
+      <span id="downloadStatus"></span>
     </div>
-
-    <div class="search-container">
-      <h3>🔢 學號直接查詢</h3>
-      <label>學號：</label>
-      <input type="text" id="studentIdInput" placeholder="輸入學號">
-      <button onclick="searchByStudentId()">查詢</button>
-    </div>
-
-    <hr>
-    <div id="result"></div>
+    <h3>名冊預覽</h3>
+    <div id="wordViewer" class="word-content"></div>
   </div>
 
-  <script type="module">
-    // 保持原有的JavaScript代碼不變
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  <hr />
+  <h2>📅 查詢刷卡紀錄</h2>
+  <input type="date" id="queryDate" />
+  <button onclick="queryRecords()">查詢</button>
+  <button onclick="window.print()">列印</button>
+
+  <table id="recordsTable">
+    <thead>
+      <tr>
+        <th>班級</th>
+        <th>學號</th>
+        <th>姓名</th>
+        <th>刷卡時間</th>
+        <th>類型</th>
+      </tr>
+    </thead>
+    <tbody id="recordsBody">
+    </tbody>
+  </table>
+
+  <script>
+    const { jsPDF } = window.jspdf;
 
     const firebaseConfig = {
-      apiKey: "AIzaSyAMlgRs8aO-eZSamx1-EF3y2obIAOLvaZI",
-      authDomain: "nanshan-student.firebaseapp.com",
-      projectId: "nanshan-student",
-      storageBucket: "nanshan-student.firebasestorage.app",
-      messagingSenderId: "879754099667",
-      appId: "1:879754099667:web:0c0805c2d918b8b41e4d26",
-      measurementId: "G-KTX7TH9ETW"
+      apiKey: "AIzaSyDIBZcv7FDus86I_tqMNdGaTGLFUH9TkGg",
+      authDomain: "new123-88a1a.firebaseapp.com",
+      databaseURL: "https://new123-88a1a-default-rtdb.firebaseio.com",
+      projectId: "new123-88a1a",
+      storageBucket: "new123-88a1a.appspot.com",
+      messagingSenderId: "1098459270837",
+      appId: "1:1098459270837:web:51532d8f2cffbf9271b8fc"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    let students = [];
+    const rfidInput = document.getElementById("rfidInput");
+    const studentIdInput = document.getElementById("studentIdInput");
+    const status = document.getElementById("status");
+    const successSound = document.getElementById("successSound");
+    const errorSound = document.getElementById("errorSound");
+    const wordContainer = document.getElementById("wordContainer");
+    const wordViewer = document.getElementById("wordViewer");
+    const downloadStatus = document.getElementById("downloadStatus");
 
-    async function loadData() {
-      try {
-        const snapshot = await getDocs(collection(db, "南山學生資料"));
-        students = [];
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          data.id = doc.id;
-          students.push(data);
-        });
-        console.log("已載入學生資料：", students.length);
-      } catch (error) {
-        console.error("載入資料失敗：", error);
-        alert("無法載入學生資料，請稍後再試");
+    let clearTimer = null;
+    let latestRecordId = null;
+    let highlightedNames = new Set();
+    let originalWordHtml = "";
+
+    // RFID刷卡處理
+    rfidInput.addEventListener("keydown", async function (event) {
+      if (event.key === "Enter") {
+        const rfid = rfidInput.value.trim();
+        if (rfid !== "") {
+          await processInput(rfid, "rfid");
+        }
+      }
+    });
+
+    // 學號輸入處理
+    studentIdInput.addEventListener("keydown", async function (event) {
+      if (event.key === "Enter") {
+        await submitStudentId();
+      }
+    });
+
+    // 學號提交處理
+    async function submitStudentId() {
+      const studentId = studentIdInput.value.trim();
+      if (studentId !== "") {
+        await processInput(studentId, "studentId");
       }
     }
 
-    function filterGrade() {
-      const type = document.getElementById("typeSelect").value;
-      const gradeSelect = document.getElementById("gradeSelect");
-      gradeSelect.innerHTML = '<option value="">--請選擇年級--</option>';
+    // 通用輸入處理函數
+    async function processInput(inputValue, inputType) {
+      try {
+        let querySnapshot;
+        let studentName = null;
+        
+        if (inputType === "rfid") {
+          querySnapshot = await db.collection("students").where("rfid", "==", inputValue).get();
+        } else {
+          querySnapshot = await db.collection("students").where("studentId", "==", inputValue).get();
+        }
+        
+        status.className = "";
+        clearTimeout(clearTimer);
 
-      const grades = new Set(
-        students.filter(s => s.學制 === type).map(s => s.年級)
-      );
+        if (!querySnapshot.empty) {
+          const data = querySnapshot.docs[0].data();
+          studentName = data.name;
+          status.textContent = `班級：${data.class}，學號：${data.studentId}，姓名：${data.name}`;
+          status.classList.add("found");
+          successSound.play();
 
-      [...grades].sort().forEach(g => {
-        const opt = document.createElement("option");
-        opt.value = g;
-        opt.textContent = g;
-        gradeSelect.appendChild(opt);
-      });
+          const docRef = await db.collection("rfid_records").add({
+            rfid: data.rfid || null,
+            class: data.class,
+            studentId: data.studentId,
+            name: data.name,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            inputType: inputType
+          });
+          latestRecordId = docRef.id;
+        } else {
+          status.textContent = `查無資料，${inputType === "rfid" ? "RFID" : "學號"}：${inputValue}`;
+          status.classList.add("not-found");
+          errorSound.play();
 
-      // 重設下層
-      document.getElementById("classSelect").innerHTML = '<option value="">--請選擇班級--</option>';
-      document.getElementById("nameSelect").innerHTML = '<option value="">--請選擇學生--</option>';
-      document.getElementById("result").innerHTML = '';
+          const docRef = await db.collection("rfid_records").add({
+            rfid: inputType === "rfid" ? inputValue : null,
+            class: null,
+            studentId: inputType === "studentId" ? inputValue : null,
+            name: null,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            inputType: inputType
+          });
+          latestRecordId = docRef.id;
+        }
+
+        if (studentName && wordViewer.innerHTML) {
+          highlightNameInWord(studentName);
+        }
+
+        await queryRecords();
+
+        clearTimer = setTimeout(() => {
+          status.textContent = "";
+          status.className = "";
+        }, 3000);
+
+        if (inputType === "rfid") {
+          rfidInput.value = "";
+          rfidInput.focus();
+        } else {
+          studentIdInput.value = "";
+          studentIdInput.focus();
+        }
+      } catch (error) {
+        status.textContent = "操作失敗：" + error.message;
+        status.className = "error";
+        errorSound.play();
+
+        clearTimer = setTimeout(() => {
+          status.textContent = "";
+          status.className = "";
+        }, 3000);
+      }
     }
 
-    function filterClass() {
-      const type = document.getElementById("typeSelect").value;
-      const grade = document.getElementById("gradeSelect").value;
-      const classSelect = document.getElementById("classSelect");
-      classSelect.innerHTML = '<option value="">--請選擇班級--</option>';
-
-      const classes = new Set(
-        students.filter(s => s.學制 === type && s.年級 === grade).map(s => s.班級)
-      );
-
-      [...classes].sort().forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c;
-        opt.textContent = c;
-        classSelect.appendChild(opt);
-      });
-
-      document.getElementById("nameSelect").innerHTML = '<option value="">--請選擇學生--</option>';
-      document.getElementById("result").innerHTML = '';
-    }
-
-    function filterNames() {
-      const type = document.getElementById("typeSelect").value;
-      const grade = document.getElementById("gradeSelect").value;
-      const cls = document.getElementById("classSelect").value;
-      const nameSelect = document.getElementById("nameSelect");
-      nameSelect.innerHTML = '<option value="">--請選擇學生--</option>';
-
-      const names = students.filter(s =>
-        s.學制 === type && s.年級 === grade && s.班級 === cls
-      );
-
-      names.sort((a, b) => a.姓名.localeCompare(b.姓名)).forEach(s => {
-        const opt = document.createElement("option");
-        opt.value = s.id;
-        opt.textContent = `${s.姓名} (${s.學號 || s.id})`;
-        nameSelect.appendChild(opt);
-      });
+    // 載入Word文件並保留格式
+    async function loadWord() {
+      const fileInput = document.getElementById("wordUpload");
+      const file = fileInput.files[0];
       
-      document.getElementById("result").innerHTML = '';
+      if (!file) {
+        alert("請先選擇Word文件");
+        return;
+      }
+
+      try {
+        downloadStatus.textContent = "正在載入Word檔...";
+        
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // 使用mammoth.js將Word轉換為HTML並保留格式
+        const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+        
+        // 保存原始HTML以便重新標記
+        originalWordHtml = result.value;
+        
+        // 顯示轉換後的HTML
+        wordViewer.innerHTML = originalWordHtml;
+        highlightedNames.clear();
+        
+        wordContainer.style.display = "block";
+        downloadStatus.textContent = "Word檔載入完成！";
+        
+        setTimeout(() => {
+          downloadStatus.textContent = "";
+        }, 3000);
+      } catch (error) {
+        console.error("Word檔載入失敗:", error);
+        downloadStatus.textContent = "Word檔載入失敗: " + error.message;
+      }
     }
 
-    function searchByStudentId() {
-      const studentId = document.getElementById("studentIdInput").value.trim();
-      if (!studentId) {
-        alert("請輸入學號");
+    // 在Word內容中高亮顯示姓名（保留原始格式）
+    function highlightNameInWord(name) {
+      if (highlightedNames.has(name)) {
         return;
       }
       
-      const student = students.find(s => 
-        s.學號 === studentId || s.id === studentId
+      // 重置為原始HTML
+      wordViewer.innerHTML = originalWordHtml;
+      
+      // 標記所有找到的姓名
+      const regex = new RegExp(escapeRegExp(name), "g");
+      wordViewer.innerHTML = wordViewer.innerHTML.replace(
+        regex, 
+        `<span class="highlight-name">${name}</span>`
       );
       
-      if (student) {
-        showStudentDetails(student);
-      } else {
-        document.getElementById("result").innerHTML = `
-          <h3>❌ 查無結果</h3>
-          <p>找不到學號為 <strong>${studentId}</strong> 的學生</p>
+      highlightedNames.add(name);
+      
+      // 更新原始HTML以包含新的標記
+      originalWordHtml = wordViewer.innerHTML;
+    }
+
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // 下載已標記的名冊
+    async function downloadMarkedRoster() {
+  if (!wordViewer || wordViewer.innerHTML === "") {
+    downloadStatus.textContent = "沒有可下載的名冊";
+    return;
+  }
+
+  downloadStatus.textContent = "正在生成檔案...";
+  
+  try {
+    // 創建 Blob 對象 (HTML格式)
+    const content = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>已標記名冊</title>
+        <style>
+          body { font-family: "Microsoft JhengHei", Arial, sans-serif; }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid black; padding: 5px; text-align: center; }
+          .highlight-name { background-color: yellow; border: 2px solid red; }
+        </style>
+      </head>
+      <body>
+        ${wordViewer.innerHTML}
+      </body>
+      </html>
+    `;
+    
+    // 創建下載連結
+    const blob = new Blob([content], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `已標記名冊_${new Date().toLocaleDateString('zh-TW')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // 清理
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      downloadStatus.textContent = "下載完成！";
+      setTimeout(() => { downloadStatus.textContent = ""; }, 3000);
+    }, 100);
+  } catch (error) {
+    console.error("生成檔案失敗:", error);
+    downloadStatus.textContent = "下載失敗: " + error.message;
+  }
+}
+
+    async function queryRecords() {
+      const dateStr = document.getElementById("queryDate").value;
+      if (!dateStr) {
+        const today = new Date();
+        const dateInput = document.getElementById("queryDate");
+        dateInput.valueAsDate = today;
+        return await queryRecords();
+      }
+
+      const date = new Date(dateStr);
+      const start = new Date(date.setHours(0, 0, 0, 0));
+      const end = new Date(date.setHours(23, 59, 59, 999));
+
+      const snapshot = await db.collection("rfid_records")
+        .where("timestamp", ">=", start)
+        .where("timestamp", "<=", end)
+        .orderBy("timestamp", "desc")
+        .get();
+
+      const tbody = document.getElementById("recordsBody");
+      tbody.innerHTML = "";
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const time = data.timestamp?.toDate().toLocaleTimeString("zh-TW") || "無時間";
+        const inputType = data.inputType === "rfid" ? "RFID刷卡" : "學號輸入";
+
+        const row = document.createElement("tr");
+        if (doc.id === latestRecordId) {
+          row.classList.add("latest-record");
+        }
+        row.innerHTML = `
+          <td>${data.class || ""}</td>
+          <td>${data.studentId || ""}</td>
+          <td>${data.name || ""}</td>
+          <td>${time}</td>
+          <td>${inputType}</td>
         `;
-      }
+        tbody.appendChild(row);
+      });
+      
+      latestRecordId = null;
     }
 
-    function showStudent() {
-      const id = document.getElementById("nameSelect").value;
-      const student = students.find(s => s.id === id);
-      if (student) {
-        showStudentDetails(student);
-      }
-    }
-
-    function showStudentDetails(student) {
-      document.getElementById("result").innerHTML = `
-        <h3>🎓 學生詳細資料</h3>
-        <div class="student-info">
-          <p><strong>學號：</strong> ${student.學號 || student.id}</p>
-          <p><strong>姓名：</strong> ${student.姓名}</p>
-          <p><strong>學制：</strong> ${student.學制}</p>
-          <p><strong>年級：</strong> ${student.年級}</p>
-          <p><strong>班級：</strong> ${student.班級}</p>
-        </div>
-      `;
-    }
-
-    // 掛載函數到全局
-    window.filterGrade = filterGrade;
-    window.filterClass = filterClass;
-    window.filterNames = filterNames;
-    window.showStudent = showStudent;
-    window.searchByStudentId = searchByStudentId;
-
-    window.onload = loadData;
+    window.onload = function() {
+      queryRecords();
+    };
   </script>
 </body>
 </html>
